@@ -1,0 +1,34 @@
+#!/bin/sh
+#
+# PROVIDE: ffremote
+# REQUIRE: LOGIN NETWORKING
+# KEYWORD: shutdown
+
+. /etc/rc.subr
+
+name="ffremote"
+rcvar="ffremote_enable"
+
+load_rc_config "$name"
+
+: ${ffremote_enable:=NO}
+: ${ffremote_urls:=http://localhost:@PORT@}
+: ${ffremote_user:=@USER@}
+
+pidfile="/var/run/@ASSEMBLY_NAME@.pid"
+logfile="/var/log/@ASSEMBLY_NAME@.log"
+workdir="@SYSCONFDIR@/@ASSEMBLY_NAME@"
+command="@BINDIR@/@ASSEMBLY_NAME@"
+
+start_cmd="ffremote_start"
+
+ffremote_start() {
+    cd ${workdir} && \
+    ASPNETCORE_ENVIRONMENT=Production \
+    ASPNETCORE_URLS=${ffremote_urls} \
+    DOTNET_BUNDLE_EXTRACT_BASE_DIR=/var/tmp/.net \
+    DOTNET_PRINT_TELEMETRY_MESSAGE=false \
+    /usr/sbin/daemon -p ${pidfile} -u ${ffremote_user} -o ${logfile} ${command}
+}
+
+run_rc_command "$1"
