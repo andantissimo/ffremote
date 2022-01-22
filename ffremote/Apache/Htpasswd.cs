@@ -75,7 +75,7 @@ internal class Htpasswd : Dictionary<string, string>
         To64(encrypted.AsSpan(16), final[ 4] << 16 | final[10] << 8 | final[ 5], 4);
         To64(encrypted.AsSpan(20), final[11], 2);
 
-        return new string(encrypted);
+        return new(encrypted);
 
         static void To64(Span<char> p, int v, int n)
         {

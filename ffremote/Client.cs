@@ -201,7 +201,7 @@ internal class Client : BackgroundService
                 sock.Options.Cookies = handler.CookieContainer;
                 if (client.DefaultRequestHeaders.Authorization is not null)
                     sock.Options.SetRequestHeader(HeaderNames.Authorization, $"{client.DefaultRequestHeaders.Authorization}");
-                await sock.ConnectAsync(new Uri(client.BaseAddress.ToWebSocketUri(), $"{id}"), stopping).ConfigureAwait(false);
+                await sock.ConnectAsync(new(client.BaseAddress.ToWebSocketUri(), $"{id}"), stopping).ConfigureAwait(false);
                 #pragma warning disable IL2026
                 await sock.SendAsJsonAsync(file.Length, stopping).ConfigureAwait(false);
                 #pragma warning restore IL2026

@@ -51,7 +51,7 @@ internal class Worker
     {
         _lifetime = lifetime;
         _logger = logger;
-        _address = new Uri(server.Features.Get<IServerAddressesFeature>()?.Addresses?.FirstOrDefault() ?? DefaultServerAddress);
+        _address = new(server.Features.Get<IServerAddressesFeature>()?.Addresses?.FirstOrDefault() ?? DefaultServerAddress);
         _htpasswd = htpasswd;
     }
 
@@ -158,7 +158,7 @@ internal class Worker
         {
             sid = Guid.NewGuid();
 
-            session = new Session { Aborted = aborted };
+            session = new() { Aborted = aborted };
             if (!_sessions.TryAdd(sid, session))
                 throw new InvalidOperationException($"Session ID conflicted: {sid}");
             _logger.LogDebug("Session started: {SessionId}", sid);
