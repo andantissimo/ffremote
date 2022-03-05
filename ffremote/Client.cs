@@ -19,8 +19,6 @@ internal class Client : BackgroundService
     private readonly IHostApplicationLifetime _lifetime;
     private readonly ILogger _logger;
 
-    private int _exitCode = 1;
-
     public Client(IHostApplicationLifetime lifetime, ILogger<Client> logger)
     {
         _lifetime = lifetime;
@@ -29,15 +27,16 @@ internal class Client : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        Environment.ExitCode = 1;
         try
         {
             var args = Environment.GetCommandLineArgs()[1..];
             var (code, stdout, stderr) = await RunAsync(args, stoppingToken).ConfigureAwait(false);
-            _exitCode = code;
             if (stderr is { Length: > 0 })
                 Console.Error.WriteLine(stderr);
             if (stdout is { Length: > 0 })
                 Console.Out.WriteLine(stdout);
+            Environment.ExitCode = code;
         }
         catch (Exception ex) when (ex is HttpRequestException or WebSocketException)
         {
@@ -48,7 +47,7 @@ internal class Client : BackgroundService
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {
             _logger.LogDebug("Application stopping");
-            _exitCode = 130; // SIGINT
+            Environment.ExitCode = 130; // SIGINT
         }
         catch (Exception ex)
         {
