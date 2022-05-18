@@ -59,7 +59,7 @@ internal class Client : BackgroundService
         }
     }
 
-    private async Task<(int ExitCode, string? Output, string? Error)> RunAsync(string[] args, CancellationToken stopping)
+    private static async Task<(int ExitCode, string? Output, string? Error)> RunAsync(string[] args, CancellationToken stopping)
     {
         bool? overwrite = null;
         var endpoint = DefaultWorkerEndpoint;

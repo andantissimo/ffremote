@@ -6,6 +6,7 @@ internal class Worker
     /// <see cref="Microsoft.AspNetCore.Server.Kestrel.Core.Internal.Infrastructure.Constants.DefaultServerAddress"/>
     /// </summary>
     private const string DefaultServerAddress = "http://localhost:5000";
+
     /// <summary>
     /// <see cref="Microsoft.AspNetCore.Mvc.Infrastructure.FileResultExecutorBase.BufferSize" />
     /// </summary>
