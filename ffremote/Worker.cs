@@ -387,29 +387,20 @@ internal class Worker
             startInfo.ArgumentList.Add(args);
             _logger.LogDebug("Arguments: {Arguments}", q);
 
-            StringBuilder stderr = new(), stdout = new();
+            MemoryStream stderr = new(), stdout = new();
             using var process = new Process { StartInfo = startInfo };
-            process.ErrorDataReceived += (_, e) =>
-            {
-                _logger.LogTrace("{ErrorData}", e.Data);
-                if (e.Data is string line)
-                    stderr.AppendLine(line);
-            };
-            process.OutputDataReceived += (_, e) =>
-            {
-                _logger.LogTrace("{OutputData}", e.Data);
-                if (e.Data is string line)
-                    stdout.AppendLine(line);
-            };
-            var task = process.StartAsync(aborted);
-            process.BeginOutputReadLine();
-            process.BeginErrorReadLine();
-            var exitCode = await task.ConfigureAwait(false);
-            process.CancelOutputRead();
-            process.CancelErrorRead();
-            _logger.LogDebug("Exit code: {Code}", exitCode);
+            await Task.WhenAll(
+                process.StartAsync(aborted),
+                process.StandardError.BaseStream.CopyToAsync(stderr, aborted),
+                process.StandardOutput.BaseStream.CopyToAsync(stdout, aborted)
+            ).ConfigureAwait(false);
+            _logger.LogDebug("Exit code: {Code}", process.ExitCode);
 
-            var pair = new[] { stdout.ToString().Trim(), stderr.ToString().Trim() };
+            var pair = new[]
+            {
+                SystemEncoding.GetString(stdout.ToArray()),
+                SystemEncoding.GetString(stderr.ToArray()),
+            };
             #pragma warning disable IL2026
             await response.WriteAsJsonAsync(pair, aborted).ConfigureAwait(false);
             #pragma warning restore IL2026

@@ -33,9 +33,9 @@ internal class Client : BackgroundService
             var args = Environment.GetCommandLineArgs()[1..];
             var (code, stdout, stderr) = await RunAsync(args, stoppingToken).ConfigureAwait(false);
             if (stderr is { Length: > 0 })
-                Console.Error.WriteLine(stderr);
+                Console.Error.Write(stderr);
             if (stdout is { Length: > 0 })
-                Console.Out.WriteLine(stdout);
+                Console.Out.Write(stdout);
             Environment.ExitCode = code;
         }
         catch (Exception ex) when (ex is HttpRequestException or WebSocketException)
