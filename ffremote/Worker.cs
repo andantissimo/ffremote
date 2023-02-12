@@ -1,5 +1,3 @@
-using static Microsoft.AspNetCore.Http.StatusCodes;
-
 internal class Worker
 {
     /// <summary>
