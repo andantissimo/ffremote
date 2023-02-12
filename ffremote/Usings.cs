@@ -1,6 +1,8 @@
 global using Microsoft.AspNetCore.Hosting.Server;
 global using Microsoft.AspNetCore.Hosting.Server.Features;
 global using Microsoft.AspNetCore.WebUtilities;
+global using Microsoft.Extensions.FileProviders;
+global using Microsoft.Extensions.FileProviders.Physical;
 global using Microsoft.Extensions.Options;
 global using Microsoft.Extensions.Primitives;
 global using Microsoft.Net.Http.Headers;

@@ -13,7 +13,8 @@ if (Environment.GetEnvironmentVariable("ASPNETCORE_URLS") is not { Length: > 0 }
     }
     await Host.CreateDefaultBuilder(FFmpeg.TranslateArguments(args))
               .ConfigureServices(services => services.AddHostedService<Client>())
-              .RunConsoleAsync(console => console.SuppressStatusMessages = true);
+              .RunConsoleAsync(console => console.SuppressStatusMessages = true)
+              .ConfigureAwait(false);
 }
 else
 {

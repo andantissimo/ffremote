@@ -57,8 +57,8 @@ internal class Worker
     public async Task InvokeAsync(HttpContext context)
     {
         var (request, response) = (context.Request, context.Response);
-
-        var aborted = CancellationTokenSource.CreateLinkedTokenSource(context.RequestAborted, _lifetime.ApplicationStopping).Token;
+        var (aborted, stopping) = (context.RequestAborted, _lifetime.ApplicationStopping);
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(aborted, stopping);
         try
         {
             var htpasswd = _htpasswd.CurrentValue;
@@ -80,16 +80,16 @@ internal class Worker
             if (context.WebSockets.IsWebSocketRequest)
             {
                 using var socket = await context.WebSockets.AcceptWebSocketAsync().ConfigureAwait(false);
-                await HandleWebSocketAsync(request, socket, aborted).ConfigureAwait(false);
+                await HandleWebSocketAsync(request, socket, linked.Token).ConfigureAwait(false);
             }
             else if (HttpMethods.IsGet(request.Method))
             {
-                if (await HandleGetAsync(request, response, aborted).ConfigureAwait(false) is int statusCode)
+                if (await HandleGetAsync(request, response, linked.Token).ConfigureAwait(false) is int statusCode)
                     response.StatusCode = statusCode;
             }
             else if (HttpMethods.IsPut(request.Method))
             {
-                if (await HandlePutAsync(request, response, aborted).ConfigureAwait(false) is int statusCode)
+                if (await HandlePutAsync(request, response, linked.Token).ConfigureAwait(false) is int statusCode)
                     response.StatusCode = statusCode;
             }
             else
@@ -101,11 +101,11 @@ internal class Worker
         {
             _logger.LogDebug("Connection closed prematurely");
         }
-        catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested)
+        catch (OperationCanceledException) when (aborted.IsCancellationRequested)
         {
             _logger.LogDebug("Request aborted");
         }
-        catch (OperationCanceledException) when (_lifetime.ApplicationStopping.IsCancellationRequested)
+        catch (OperationCanceledException) when (stopping.IsCancellationRequested)
         {
             _logger.LogDebug("Application stopping");
             response.End(Status503ServiceUnavailable);
@@ -134,21 +134,21 @@ internal class Worker
             if (!Guid.TryParse(Path.GetFileNameWithoutExtension(request.Path), out var id))
                 throw new ArgumentException("Input ID is missing or not valid");
 
-            aborted = CancellationTokenSource.CreateLinkedTokenSource(aborted, session.Aborted).Token;
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(aborted, session.Aborted);
 
             #pragma warning disable IL2026
-            var length = await socket.ReceiveFromJsonAsync<long>(aborted).ConfigureAwait(false);
+            var length = await socket.ReceiveFromJsonAsync<long>(linked.Token).ConfigureAwait(false);
             #pragma warning restore IL2026
             if (!session.Inputs.TryAdd(id, (socket, length, new(1, 1))))
                 throw new ArgumentException($"Input ID conflicted: {id}");
             _logger.LogDebug("Input connected: {SessionId}/{Id}", sid, id);
             try
             {
-                await Task.WhenAny(session.Exited.Task, Task.Delay(Timeout.Infinite, aborted)).ConfigureAwait(false);
-                await socket.CloseAsync(WebSocketCloseStatus.NormalClosure, null, aborted).ConfigureAwait(false);
+                await Task.WhenAny(session.Exited.Task, Task.Delay(Timeout.Infinite, linked.Token)).ConfigureAwait(false);
+                await socket.CloseAsync(WebSocketCloseStatus.NormalClosure, null, linked.Token).ConfigureAwait(false);
                 _logger.LogDebug("Input closed: {SessionId}/{Id}", sid, id);
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException) when (linked.IsCancellationRequested)
             {
                 _logger.LogDebug("Input canceled: {SessionId}/{Id}", sid, id);
             }
@@ -235,11 +235,10 @@ internal class Worker
                 process.ErrorDataReceived += async (_, e) =>
                 {
                     _logger.LogTrace("{ErrorData}", e.Data);
-                    if (e.Data is string line)
-                    {
-                        if (!aborted.IsCancellationRequested && socket.State == WebSocketState.Open)
-                            await socket.SendAsync(line, aborted).ConfigureAwait(false);
-                    }
+                    if (e.Data is not string line)
+                        return;
+                    if (!aborted.IsCancellationRequested && socket.State == WebSocketState.Open)
+                        await socket.SendAsync(line, aborted).ConfigureAwait(false);
                 };
                 var exited = process.StartAsync(aborted);
                 process.BeginErrorReadLine();
@@ -262,7 +261,7 @@ internal class Worker
                             await output.Sent.Task.ConfigureAwait(false);
                             _logger.LogDebug("Output completed: {SessionId}/{Id}", sid, id);
                         }
-                        catch (OperationCanceledException)
+                        catch (OperationCanceledException) when (output.Sent.Task.IsCanceled)
                         {
                             _logger.LogDebug("Output canceled: {SessionId}/{Id}", sid, id);
                         }
@@ -272,7 +271,7 @@ internal class Worker
 
                 _logger.LogDebug("Session ended: {SessionId}", sid);
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException) when (aborted.IsCancellationRequested)
             {
                 _logger.LogDebug("Session aborted: {SessionId}", sid);
                 session.Exited.TrySetCanceled(aborted);
@@ -301,7 +300,7 @@ internal class Worker
             if (!Guid.TryParse(Path.GetFileNameWithoutExtension(request.Path), out var id))
                 return Status404NotFound;
 
-            aborted = CancellationTokenSource.CreateLinkedTokenSource(aborted, session.Aborted).Token;
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(aborted, session.Aborted);
 
             if (session.Inputs.TryGetValue(id, out var input))
             {
@@ -324,7 +323,7 @@ internal class Worker
                     {
                         var length = (int)Math.Min(to + 1 - offset, BufferSize);
                         Memory<byte> chunk = default;
-                        await input.Semaphore.WaitAsync(aborted).ConfigureAwait(false);
+                        await input.Semaphore.WaitAsync(linked.Token).ConfigureAwait(false);
                         try
                         {
                             await input.Socket.SendAsync($"{new RangeHeaderValue(offset, offset + length - 1)}", session.Aborted).ConfigureAwait(false);
@@ -334,14 +333,14 @@ internal class Worker
                         {
                             input.Semaphore.Release();
                         }
-                        aborted.ThrowIfCancellationRequested();
+                        linked.Token.ThrowIfCancellationRequested();
                         if (chunk.Length != length)
                             throw new InvalidOperationException($"Bad length: request={length}, response={chunk.Length}");
-                        await response.Body.WriteAsync(chunk, aborted).ConfigureAwait(false);
+                        await response.Body.WriteAsync(chunk, linked.Token).ConfigureAwait(false);
                     }
                     _logger.LogDebug("Input ended: {SessionId}/{Id} {From}-{To}", sid, id, from, to);
                 }
-                catch (OperationCanceledException)
+                catch (OperationCanceledException) when (linked.IsCancellationRequested)
                 {
                     _logger.LogDebug("Input aborted: {SessionId}/{Id} {From}-{To}", sid, id, from, to);
                 }
@@ -360,7 +359,7 @@ internal class Worker
                     _logger.LogDebug("Output ended: {SessionId}/{Id}", sid, id);
                     output.Sent.TrySetResult();
                 }
-                catch (OperationCanceledException)
+                catch (OperationCanceledException) when (aborted.IsCancellationRequested)
                 {
                     _logger.LogDebug("Output aborted: {SessionId}/{Id}", sid, id);
                     output.Sent.TrySetCanceled(aborted);

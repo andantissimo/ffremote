@@ -10,6 +10,31 @@ insert_final_newline = true
 # allow using _logger.Log*** methods
 dotnet_diagnostic.CA1848.severity = silent
 
+# Dispose objects before losing scope
+dotnet_diagnostic.CA2007.severity = error
+# Do not directly await a Task
+dotnet_diagnostic.CA2007.severity = error
+# Do not assign property within its setter
+dotnet_diagnostic.CA2011.severity = error
+# Use ValueTasks correctly
+dotnet_diagnostic.CA2012.severity = error
+# Forward the CancellationToken parameter to methods that take one
+dotnet_diagnostic.CA2016.severity = error
+# Parameter count mismatch
+dotnet_diagnostic.CA2017.severity = error
+# Provide correct arguments to formatting methods
+dotnet_diagnostic.CA2241.severity = error
+# Test for NaN correctly
+dotnet_diagnostic.CA2242.severity = error
+# Do not duplicate indexed element initializations
+dotnet_diagnostic.CA2244.severity = error
+# Do not assign a property to itself
+dotnet_diagnostic.CA2245.severity = error
+# Do not assign a symbol and its member in the same statement
+dotnet_diagnostic.CA2246.severity = error
+# Provide correct enum argument to Enum.HasFlag
+dotnet_diagnostic.CA2248.severity = error
+
 [*.json]
 charset = utf-8
 end_of_line = lf

@@ -25,13 +25,13 @@ internal class Client : BackgroundService
         _logger = logger;
     }
 
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    protected override async Task ExecuteAsync(CancellationToken stopping)
     {
         Environment.ExitCode = 1;
         try
         {
             var args = Environment.GetCommandLineArgs()[1..];
-            var (code, stdout, stderr) = await RunAsync(args, stoppingToken).ConfigureAwait(false);
+            var (code, stdout, stderr) = await RunAsync(args, stopping).ConfigureAwait(false);
             if (stderr is { Length: > 0 })
                 Console.Error.Write(stderr);
             if (stdout is { Length: > 0 })
@@ -44,7 +44,7 @@ internal class Client : BackgroundService
                 ex = inner;
             Console.Error.WriteLine(ex.Message);
         }
-        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        catch (OperationCanceledException) when (stopping.IsCancellationRequested)
         {
             _logger.LogDebug("Application stopping");
             Environment.ExitCode = 130; // SIGINT
