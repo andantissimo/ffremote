@@ -145,7 +145,8 @@ internal class Worker
             try
             {
                 await Task.WhenAny(session.Exited.Task, Task.Delay(Timeout.Infinite, linked.Token)).ConfigureAwait(false);
-                await socket.CloseAsync(WebSocketCloseStatus.NormalClosure, null, linked.Token).ConfigureAwait(false);
+                if (socket.State is WebSocketState.Open)
+                    await socket.CloseAsync(WebSocketCloseStatus.NormalClosure, null, linked.Token).ConfigureAwait(false);
                 _logger.LogDebug("Input closed: {SessionId}/{Id}", sid, id);
             }
             catch (OperationCanceledException) when (linked.IsCancellationRequested)
@@ -343,6 +344,10 @@ internal class Worker
                 catch (OperationCanceledException) when (linked.IsCancellationRequested)
                 {
                     _logger.LogDebug("Input aborted: {SessionId}/{Id} {From}-{To}", sid, id, from, to);
+                }
+                catch (WebSocketException ex) when (ex.WebSocketErrorCode == WebSocketError.ConnectionClosedPrematurely)
+                {
+                    _logger.LogDebug("Input stopped: {SessionId}/{Id} {From}-{To}", sid, id, from, to);
                 }
                 return null;
             }
