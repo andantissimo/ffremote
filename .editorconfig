@@ -11,7 +11,7 @@ insert_final_newline = true
 dotnet_diagnostic.CA1848.severity = silent
 
 # Dispose objects before losing scope
-dotnet_diagnostic.CA2007.severity = error
+dotnet_diagnostic.CA2000.severity = error
 # Do not directly await a Task
 dotnet_diagnostic.CA2007.severity = error
 # Do not assign property within its setter
