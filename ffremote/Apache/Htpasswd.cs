@@ -4,6 +4,8 @@ namespace Apache;
 [SuppressMessage("Security", "CA5351", Justification = "use MD5")]
 internal class Htpasswd : Dictionary<string, string>
 {
+    private const string APR1Base64Chars = "./0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+
     private static readonly Regex APR1Pattern = new(@"^\$apr1\$([^$]{8})\$(.+)$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
     private static readonly Regex SHA1Pattern = new(@"^\{SHA\}(.+)$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
@@ -67,23 +69,29 @@ internal class Htpasswd : Dictionary<string, string>
             final = ctx1.Hash!;
         }
 
-        var encrypted = new char[22];
-        To64(encrypted.AsSpan( 0), final[ 0] << 16 | final[ 6] << 8 | final[12], 4);
-        To64(encrypted.AsSpan( 4), final[ 1] << 16 | final[ 7] << 8 | final[13], 4);
-        To64(encrypted.AsSpan( 8), final[ 2] << 16 | final[ 8] << 8 | final[14], 4);
-        To64(encrypted.AsSpan(12), final[ 3] << 16 | final[ 9] << 8 | final[15], 4);
-        To64(encrypted.AsSpan(16), final[ 4] << 16 | final[10] << 8 | final[ 5], 4);
-        To64(encrypted.AsSpan(20), final[11], 2);
-
-        return new(encrypted);
-
-        static void To64(Span<char> p, int v, int n)
+        var encrypted = ArrayPool<char>.Shared.Rent(22);
+        try
         {
-            for (var i = 0; i < n; i++)
-            {
-                p[i] = "./0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"[v & 0x3F];
-                v >>= 6;
-            }
+            APR1Base64(encrypted.AsSpan( 0), final[ 0] << 16 | final[ 6] << 8 | final[12], 4);
+            APR1Base64(encrypted.AsSpan( 4), final[ 1] << 16 | final[ 7] << 8 | final[13], 4);
+            APR1Base64(encrypted.AsSpan( 8), final[ 2] << 16 | final[ 8] << 8 | final[14], 4);
+            APR1Base64(encrypted.AsSpan(12), final[ 3] << 16 | final[ 9] << 8 | final[15], 4);
+            APR1Base64(encrypted.AsSpan(16), final[ 4] << 16 | final[10] << 8 | final[ 5], 4);
+            APR1Base64(encrypted.AsSpan(20), final[11], 2);
+            return new(encrypted, 0, 22);
+        }
+        finally
+        {
+            ArrayPool<char>.Shared.Return(encrypted);
+        }
+    }
+
+    private static void APR1Base64(Span<char> p, int v, int n)
+    {
+        for (var i = 0; i < n; i++)
+        {
+            p[i] = APR1Base64Chars[v & 0x3F];
+            v >>= 6;
         }
     }
 }

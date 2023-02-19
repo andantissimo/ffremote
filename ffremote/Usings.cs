@@ -6,6 +6,7 @@ global using Microsoft.Extensions.FileProviders.Physical;
 global using Microsoft.Extensions.Options;
 global using Microsoft.Extensions.Primitives;
 global using Microsoft.Net.Http.Headers;
+global using System.Buffers;
 global using System.Collections.Concurrent;
 global using System.Diagnostics;
 global using System.Diagnostics.CodeAnalysis;

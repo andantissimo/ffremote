@@ -323,21 +323,24 @@ internal class Worker
                     for (var offset = from; offset <= to; offset += BufferSize)
                     {
                         var length = (int)Math.Min(to + 1 - offset, BufferSize);
-                        Memory<byte> chunk = default;
+                        using var chunk = await ReceiveChunkAsync(offset, offset + length - 1).ConfigureAwait(false);
+                        linked.Token.ThrowIfCancellationRequested();
+                        if (chunk.Memory.Length != length)
+                            throw new InvalidOperationException($"Bad length: request={length}, response={chunk.Memory.Length}");
+                        await response.Body.WriteAsync(chunk.Memory, linked.Token).ConfigureAwait(false);
+                    }
+                    async ValueTask<IMemoryOwner<byte>> ReceiveChunkAsync(long from, long to)
+                    {
                         await input.Semaphore.WaitAsync(linked.Token).ConfigureAwait(false);
                         try
                         {
-                            await input.Socket.SendAsync($"{new RangeHeaderValue(offset, offset + length - 1)}", session.Aborted).ConfigureAwait(false);
-                            chunk = await input.Socket.ReceiveBytesAsync(session.Aborted).ConfigureAwait(false);
+                            await input.Socket.SendAsync($"{new RangeHeaderValue(from, to)}", session.Aborted).ConfigureAwait(false);
+                            return await input.Socket.ReceiveBinaryAsync((int)(to + 1 - from), session.Aborted).ConfigureAwait(false);
                         }
                         finally
                         {
                             input.Semaphore.Release();
                         }
-                        linked.Token.ThrowIfCancellationRequested();
-                        if (chunk.Length != length)
-                            throw new InvalidOperationException($"Bad length: request={length}, response={chunk.Length}");
-                        await response.Body.WriteAsync(chunk, linked.Token).ConfigureAwait(false);
                     }
                     _logger.LogDebug("Input ended: {SessionId}/{Id} {From}-{To}", sid, id, from, to);
                 }
@@ -389,7 +392,8 @@ internal class Worker
             startInfo.ArgumentList.Add(args);
             _logger.LogDebug("Arguments: {Arguments}", q);
 
-            MemoryStream stderr = new(), stdout = new();
+            using var stderr = new MemoryPoolStream();
+            using var stdout = new MemoryPoolStream();
             using var process = new Process { StartInfo = startInfo };
             await Task.WhenAll(
                 process.StartAsync(aborted),
@@ -400,8 +404,8 @@ internal class Worker
 
             var pair = new[]
             {
-                SystemEncoding.GetString(stdout.ToArray()),
-                SystemEncoding.GetString(stderr.ToArray()),
+                SystemEncoding.GetString(stdout.Memory.Span),
+                SystemEncoding.GetString(stderr.Memory.Span),
             };
             #pragma warning disable IL2026
             await response.WriteAsJsonAsync(pair, aborted).ConfigureAwait(false);

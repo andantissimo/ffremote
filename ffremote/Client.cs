@@ -207,17 +207,18 @@ internal class Client : BackgroundService
                 connected.TrySetResult();
                 while (sock.State == WebSocketState.Open && !stopping.IsCancellationRequested)
                 {
-                    using var stream = new MemoryStream();
+                    using var stream = new MemoryPoolStream();
                     var type = await sock.ReceiveMessageAsync(stream, stopping).ConfigureAwait(false);
                     if (type != WebSocketMessageType.Text)
                         break;
-                    if (!RangeHeaderValue.TryParse(Encoding.UTF8.GetString(stream.GetBuffer(), 0, (int)stream.Length), out var range))
+                    if (!RangeHeaderValue.TryParse(Encoding.UTF8.GetString(stream.Memory.Span), out var range))
                         break;
                     var (from, to) = (range.Ranges.First().From!.Value, range.Ranges.First().To!.Value);
-                    var buffer = new byte[to + 1 - from];
+                    var length = (int)(to + 1 - from);
+                    using var buffer = MemoryPool<byte>.Shared.Rent(length);
                     file.Seek(from, SeekOrigin.Begin);
-                    await file.ReadAsync(buffer, stopping).ConfigureAwait(false);
-                    await sock.SendAsync(buffer, stopping).ConfigureAwait(false);
+                    await file.ReadAsync(buffer.Memory[..length], stopping).ConfigureAwait(false);
+                    await sock.SendAsync(buffer.Memory[..length], stopping).ConfigureAwait(false);
                 }
                 await sock.CloseAsync(WebSocketCloseStatus.NormalClosure, null, stopping).ConfigureAwait(false);
             }
@@ -237,7 +238,7 @@ internal class Client : BackgroundService
                 using var response = await client.PutAsync(string.Empty, content, stopping).ConfigureAwait(false);
                 response.EnsureSuccessStatusCode();
             }
-            using var stream = new MemoryStream();
+            using var stream = new MemoryPoolStream();
             var type = await socket.ReceiveMessageAsync(stream, stopping).ConfigureAwait(false);
             switch (type)
             {
@@ -246,7 +247,7 @@ internal class Client : BackgroundService
                     _ = int.TryParse(socket.CloseStatusDescription, out exitCode);
                     break;
                 case WebSocketMessageType.Text:
-                    var stderr = Encoding.UTF8.GetString(stream.GetBuffer(), 0, (int)stream.Length);
+                    var stderr = Encoding.UTF8.GetString(stream.Memory.Span);
                     if (stderr.StartsWith("frame=", StringComparison.Ordinal))
                         Console.Error.Write('\r' + stderr);
                     else
