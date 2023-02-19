@@ -52,6 +52,12 @@ internal class Worker
         _logger = logger;
         _address = new(server.Features.Get<IServerAddressesFeature>()?.Addresses?.FirstOrDefault() ?? DefaultServerAddress);
         _htpasswd = htpasswd;
+
+        if (_address.HostNameType == UriHostNameType.IPv4 && IPAddress.Parse(_address.Host) == IPAddress.Any ||
+            _address.HostNameType == UriHostNameType.IPv6 && IPAddress.Parse(_address.Host) == IPAddress.IPv6Any)
+        {
+            _address = _address.SetHost("localhost");
+        }
     }
 
     public async Task InvokeAsync(HttpContext context)
