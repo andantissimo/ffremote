@@ -153,9 +153,9 @@ internal class Worker
             #pragma warning restore IL2026
             if (!session.Inputs.TryAdd(id, (socket, length, new(1, 1))))
                 throw new ArgumentException($"Input ID conflicted: {id}");
-            _logger.LogDebug("Input connected: {SessionId}/{Id}", sid, id);
             try
             {
+                _logger.LogDebug("Input connected: {SessionId}/{Id}", sid, id);
                 await Task.WhenAny(session.Exited.Task, Task.Delay(Timeout.Infinite, linked.Token)).ConfigureAwait(false);
                 if (socket.State is WebSocketState.Open)
                     await socket.CloseAsync(WebSocketCloseStatus.NormalClosure, null, linked.Token).ConfigureAwait(false);
@@ -171,11 +171,13 @@ internal class Worker
             sid = Guid.NewGuid();
 
             session = new() { Aborted = aborted };
+            request.HttpContext.Response.RegisterForDispose(session);
             if (!_sessions.TryAdd(sid, session))
                 throw new InvalidOperationException($"Session ID conflicted: {sid}");
-            _logger.LogDebug("Session started: {SessionId}", sid);
             try
             {
+                _logger.LogDebug("Session started: {SessionId}", sid);
+
                 await socket.SendAsync($"{new SetCookieHeaderValue(Session.Name, $"{sid}")}", aborted).ConfigureAwait(false);
 
                 #pragma warning disable IL2026
@@ -301,7 +303,6 @@ internal class Worker
                         _logger.LogDebug("Output deleted: {Name}", output.File.Name);
                     }
                 }
-                session.Dispose();
             }
         }
     }
