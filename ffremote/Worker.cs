@@ -35,7 +35,7 @@ internal class Worker
 
     private readonly ConcurrentDictionary<Guid, Session> _sessions = new();
 
-    private class Session
+    private class Session : IDisposable
     {
         internal const string Name = "sid";
 
@@ -44,6 +44,12 @@ internal class Worker
         internal StreamWriter? StandardInput;
         internal TaskCompletionSource<int> Exited { get; } = new();
         internal CancellationToken Aborted { get; init; }
+
+        public void Dispose()
+        {
+            foreach (var (_, input) in Inputs)
+                input.Semaphore.Dispose();
+        }
     }
 
     public Worker(RequestDelegate _, IHostApplicationLifetime lifetime, ILogger<Worker> logger, IServer server, IOptionsMonitor<Apache.Htpasswd> htpasswd)
@@ -295,6 +301,7 @@ internal class Worker
                         _logger.LogDebug("Output deleted: {Name}", output.File.Name);
                     }
                 }
+                session.Dispose();
             }
         }
     }
@@ -318,13 +325,15 @@ internal class Worker
                 var to = range.Ranges.First().To ?? input.Length - 1;
                 if (to < from || from < 0 || input.Length <= to)
                     return Status416RangeNotSatisfiable;
+
+                response.StatusCode = Status206PartialContent;
+                response.ContentLength = to + 1 - from;
+                response.Headers.AcceptRanges = $"{range.Unit}";
+                response.GetTypedHeaders().ContentRange = new(from, to, input.Length);
+                response.HttpContext.Features.Get<IHttpResponseBodyFeature>()?.DisableBuffering();
                 try
                 {
-                    response.StatusCode = Status206PartialContent;
-                    response.ContentLength = to + 1 - from;
-                    response.Headers.AcceptRanges = $"{range.Unit}";
-                    response.Headers.ContentRange = $"{new ContentRangeHeaderValue(from, to, input.Length)}";
-
+                    await response.StartAsync(linked.Token).ConfigureAwait(false);
                     _logger.LogDebug("Input started: {SessionId}/{Id} {From}-{To}", sid, id, from, to);
                     for (var offset = from; offset <= to; offset += BufferSize)
                     {
