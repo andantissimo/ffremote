@@ -207,11 +207,10 @@ internal class Client : BackgroundService
                 connected.TrySetResult();
                 while (sock.State == WebSocketState.Open && !stopping.IsCancellationRequested)
                 {
-                    using var stream = new MemoryPoolStream();
-                    var type = await sock.ReceiveMessageAsync(stream, stopping).ConfigureAwait(false);
-                    if (type != WebSocketMessageType.Text)
+                    using var message = await sock.ReceiveMessageAsync(default, stopping).ConfigureAwait(false);
+                    if (message.Type != WebSocketMessageType.Text)
                         break;
-                    if (!RangeHeaderValue.TryParse(Encoding.UTF8.GetString(stream.Memory.Span), out var range))
+                    if (!RangeHeaderValue.TryParse(Encoding.UTF8.GetString(message.Memory.Span), out var range))
                         break;
                     var (from, to) = (range.Ranges.First().From!.Value, range.Ranges.First().To!.Value);
                     var length = (int)(to + 1 - from);
@@ -238,16 +237,15 @@ internal class Client : BackgroundService
                 using var response = await client.PutAsync(string.Empty, content, stopping).ConfigureAwait(false);
                 response.EnsureSuccessStatusCode();
             }
-            using var stream = new MemoryPoolStream();
-            var type = await socket.ReceiveMessageAsync(stream, stopping).ConfigureAwait(false);
-            switch (type)
+            using var message = await socket.ReceiveMessageAsync(default, stopping).ConfigureAwait(false);
+            switch (message.Type)
             {
                 case WebSocketMessageType.Close:
                     Console.Error.WriteLine();
                     _ = int.TryParse(socket.CloseStatusDescription, out exitCode);
                     break;
                 case WebSocketMessageType.Text:
-                    var stderr = Encoding.UTF8.GetString(stream.Memory.Span);
+                    var stderr = Encoding.UTF8.GetString(message.Memory.Span);
                     if (stderr.StartsWith("frame=", StringComparison.Ordinal))
                         Console.Error.Write('\r' + stderr);
                     else

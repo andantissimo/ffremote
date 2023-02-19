@@ -7,55 +7,63 @@ internal static class WebSocketExtensions
     /// </summary>
     private const int ReceiveBufferSize = 4096;
 
-    public static async ValueTask<WebSocketMessageType> ReceiveMessageAsync(this WebSocket socket, Stream stream, CancellationToken cancellationToken = default)
+    public static async ValueTask<WebSocketMessage> ReceiveMessageAsync(this WebSocket socket, int length = default, CancellationToken cancellationToken = default)
     {
-        using var buffer = MemoryPool<byte>.Shared.Rent(ReceiveBufferSize);
-        ValueWebSocketReceiveResult result;
-        do
+        #pragma warning disable CA2000
+        var stream = new MemoryPoolStream(length);
+        #pragma warning restore CA2000
+        try
         {
-            result = await socket.ReceiveAsync(buffer.Memory, cancellationToken).ConfigureAwait(false);
-            await stream.WriteAsync(buffer.Memory[..result.Count], cancellationToken).ConfigureAwait(false);
+            ValueWebSocketReceiveResult result;
+            using var buffer = MemoryPool<byte>.Shared.Rent(ReceiveBufferSize);
+            do
+            {
+                result = await socket.ReceiveAsync(buffer.Memory, cancellationToken).ConfigureAwait(false);
+                await stream.WriteAsync(buffer.Memory[..result.Count], cancellationToken).ConfigureAwait(false);
+            }
+            while (!result.EndOfMessage);
+            if (result.MessageType == WebSocketMessageType.Close && socket.CloseStatus != WebSocketCloseStatus.NormalClosure)
+                throw new WebSocketException(WebSocketError.ConnectionClosedPrematurely);
+            return new(result.MessageType, stream);
         }
-        while (!result.EndOfMessage);
-        if (result.MessageType == WebSocketMessageType.Close && socket.CloseStatus != WebSocketCloseStatus.NormalClosure)
-            throw new WebSocketException(WebSocketError.ConnectionClosedPrematurely);
-        return result.MessageType;
+        catch
+        {
+            stream.Dispose();
+            throw;
+        }
     }
 
     public static async ValueTask<IMemoryOwner<byte>> ReceiveBinaryAsync(this WebSocket socket, int length = default, CancellationToken cancellationToken = default)
     {
-        var buffer = new MemoryPoolStream(length);
+        var message = await socket.ReceiveMessageAsync(length, cancellationToken).ConfigureAwait(false);
         try
         {
-            var type = await socket.ReceiveMessageAsync(buffer, cancellationToken).ConfigureAwait(false);
-            if (type != WebSocketMessageType.Binary)
+            if (message.Type != WebSocketMessageType.Binary)
                 throw new WebSocketException(WebSocketError.InvalidMessageType);
-            return buffer;
+            return message;
         }
         catch
         {
-            buffer.Dispose();
+            message.Dispose();
             throw;
         }
     }
 
     public static async ValueTask<string> ReceiveStringAsync(this WebSocket socket, CancellationToken cancellationToken = default)
     {
-        using var stream = new MemoryPoolStream();
-        var type = await socket.ReceiveMessageAsync(stream, cancellationToken).ConfigureAwait(false);
-        if (type != WebSocketMessageType.Text)
+        using var message = await socket.ReceiveMessageAsync(default, cancellationToken).ConfigureAwait(false);
+        if (message.Type != WebSocketMessageType.Text)
             throw new WebSocketException(WebSocketError.InvalidMessageType);
-        return Encoding.UTF8.GetString(stream.Memory.Span);
+        return Encoding.UTF8.GetString(message.Memory.Span);
     }
 
     [RequiresUnreferencedCode("JSON serialization and deserialization might require types that cannot be statically analyzed. Make sure all of the required types are preserved.")]
     public static async ValueTask<T?> ReceiveFromJsonAsync<T>(this WebSocket socket, CancellationToken cancellationToken = default)
     {
-        using var stream = new MemoryPoolStream();
-        var type = await socket.ReceiveMessageAsync(stream, cancellationToken).ConfigureAwait(false);
-        if (type != WebSocketMessageType.Text)
+        using var message = await socket.ReceiveMessageAsync(default, cancellationToken).ConfigureAwait(false);
+        if (message.Type != WebSocketMessageType.Text)
             throw new WebSocketException(WebSocketError.InvalidMessageType);
-        return JsonSerializer.Deserialize<T>(stream.Memory.Span);
+        return JsonSerializer.Deserialize<T>(message.Memory.Span);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
