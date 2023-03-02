@@ -33,6 +33,7 @@ internal static class WebSocketExtensions
         }
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static async ValueTask<IMemoryOwner<byte>> ReceiveBinaryAsync(this WebSocket socket, int length = default, CancellationToken cancellationToken = default)
     {
         var message = await socket.ReceiveMessageAsync(length, cancellationToken).ConfigureAwait(false);
@@ -49,6 +50,7 @@ internal static class WebSocketExtensions
         }
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static async ValueTask<string> ReceiveStringAsync(this WebSocket socket, CancellationToken cancellationToken = default)
     {
         using var message = await socket.ReceiveMessageAsync(default, cancellationToken).ConfigureAwait(false);
@@ -57,7 +59,7 @@ internal static class WebSocketExtensions
         return Encoding.UTF8.GetString(message.Memory.Span);
     }
 
-    [RequiresUnreferencedCode("JSON serialization and deserialization might require types that cannot be statically analyzed. Make sure all of the required types are preserved.")]
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static async ValueTask<T?> ReceiveFromJsonAsync<T>(this WebSocket socket, CancellationToken cancellationToken = default)
     {
         using var message = await socket.ReceiveMessageAsync(default, cancellationToken).ConfigureAwait(false);
@@ -78,7 +80,7 @@ internal static class WebSocketExtensions
         return socket.SendAsync(Encoding.UTF8.GetBytes(text).AsMemory(), WebSocketMessageType.Text, true, cancellationToken);
     }
 
-    [RequiresUnreferencedCode("JSON serialization and deserialization might require types that cannot be statically analyzed. Make sure all of the required types are preserved.")]
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static ValueTask SendAsJsonAsync<T>(this WebSocket socket, T value, CancellationToken cancellationToken = default)
     {
         return socket.SendAsync(JsonSerializer.SerializeToUtf8Bytes(value).AsMemory(), WebSocketMessageType.Text, true, cancellationToken);

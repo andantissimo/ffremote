@@ -148,9 +148,7 @@ internal class Worker
 
             using var linked = CancellationTokenSource.CreateLinkedTokenSource(aborted, session.Aborted);
 
-            #pragma warning disable IL2026
             var length = await socket.ReceiveFromJsonAsync<long>(linked.Token).ConfigureAwait(false);
-            #pragma warning restore IL2026
             if (!session.Inputs.TryAdd(id, (socket, length, new(1, 1))))
                 throw new ArgumentException($"Input ID conflicted: {id}");
             try
@@ -180,9 +178,7 @@ internal class Worker
 
                 await socket.SendAsync($"{new SetCookieHeaderValue(Session.Name, $"{sid}")}", aborted).ConfigureAwait(false);
 
-                #pragma warning disable IL2026
                 var args = await socket.ReceiveFromJsonAsync<string[]>(aborted).ConfigureAwait(false);
-                #pragma warning restore IL2026
                 if (args is null || args.Contains(null) || args.Select(a => a.Split(':', 2)[0]).Intersect(UnsupportedOptions).Any())
                     throw new ArgumentException("Invalid arguments");
 
@@ -423,9 +419,7 @@ internal class Worker
                 SystemEncoding.GetString(stdout.Memory.Span),
                 SystemEncoding.GetString(stderr.Memory.Span),
             };
-            #pragma warning disable IL2026
             await response.WriteAsJsonAsync(pair, aborted).ConfigureAwait(false);
-            #pragma warning restore IL2026
             return null;
         }
 

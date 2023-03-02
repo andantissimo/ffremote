@@ -16,10 +16,10 @@ ifneq ($(findstring freebsd,$(RID)),)
 	PUBLISH_OPT := -p:PublishSingleFile=true
 	SERVICE_EXT := rc
 else ifneq ($(findstring osx,$(RID)),)
-	PUBLISH_OPT := -p:PublishSingleFile=true -p:PublishTrimmed=true
+	PUBLISH_OPT := -p:PublishSingleFile=true -p:PublishTrimmed=true -p:SuppressTrimAnalysisWarnings=true
 	SERVICE_EXT := plist
 else
-	PUBLISH_OPT := -p:PublishSingleFile=true -p:PublishTrimmed=true
+	PUBLISH_OPT := -p:PublishSingleFile=true -p:PublishTrimmed=true -p:SuppressTrimAnalysisWarnings=true
 	SERVICE_EXT := service
 endif
 

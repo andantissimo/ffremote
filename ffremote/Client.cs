@@ -172,9 +172,7 @@ internal class Client : BackgroundService
         if (printing)
         {
             var relativeUri = QueryHelpers.AddQueryString(string.Empty, "q", string.Join(' ', options));
-            #pragma warning disable IL2026
             var (stdout, stderr) = await client.GetFromJsonAsync<string[]>(relativeUri, stopping).ConfigureAwait(false);
-            #pragma warning restore IL2026
             return (0, stdout, stderr);
         }
 
@@ -201,9 +199,7 @@ internal class Client : BackgroundService
                 if (client.DefaultRequestHeaders.Authorization is not null)
                     sock.Options.SetRequestHeader(HeaderNames.Authorization, $"{client.DefaultRequestHeaders.Authorization}");
                 await sock.ConnectAsync(new(client.BaseAddress.ToWebSocketUri(), $"{id}"), stopping).ConfigureAwait(false);
-                #pragma warning disable IL2026
                 await sock.SendAsJsonAsync(file.Length, stopping).ConfigureAwait(false);
-                #pragma warning restore IL2026
                 connected.TrySetResult();
                 while (sock.State == WebSocketState.Open && !stopping.IsCancellationRequested)
                 {
@@ -224,9 +220,7 @@ internal class Client : BackgroundService
         }
         await Task.WhenAll(inputTaskSets.Select(set => set.Connected)).ConfigureAwait(false);
 
-        #pragma warning disable IL2026
         await socket.SendAsJsonAsync(options, stopping).ConfigureAwait(false);
-        #pragma warning restore IL2026
         int exitCode = 1;
         while (socket.State == WebSocketState.Open && !stopping.IsCancellationRequested)
         {
