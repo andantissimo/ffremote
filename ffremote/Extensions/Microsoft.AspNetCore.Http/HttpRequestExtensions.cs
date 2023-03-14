@@ -10,21 +10,14 @@ internal static class HttpRequestExtensions
         username = default;
         password = default;
 
-        if (!System.Net.Http.Headers.AuthenticationHeaderValue.TryParse(request.Headers.Authorization, out var auth))
+        if (!AuthenticationHeaderValue.TryParse(request.Headers.Authorization, out var auth))
             return false;
-        if (auth.Scheme?.Equals(Basic, StringComparison.OrdinalIgnoreCase) != true || auth.Parameter is null)
+        if (auth.Scheme?.Equals(Basic, OrdinalIgnoreCase) != true || auth.Parameter is null)
             return false;
-        var buffer = ArrayPool<byte>.Shared.Rent(80);
-        try
-        {
-            if (!Convert.TryFromBase64String(auth.Parameter, buffer, out var length))
-                return false;
-            (username, password) = Encoding.UTF8.GetString(buffer, 0, length).Split(':', 2);
-        }
-        finally
-        {
-            ArrayPool<byte>.Shared.Return(buffer);
-        }
+        Span<byte> buffer = stackalloc byte[80];
+        if (!Convert.TryFromBase64String(auth.Parameter, buffer, out var length))
+            return false;
+        (username, password) = Encoding.UTF8.GetString(buffer[..length]).Split(':', 2);
         return password is not null;
     }
 }

@@ -158,14 +158,14 @@ internal class Client : BackgroundService
                     if (overwrite == false)
                         return (1, null, $"File '{path}' already exists. Exiting.");
                     Console.Error.Write("File '{0}' already exists, Overwrite? [y/N] ", path);
-                    if (Console.ReadLine()?.Equals("y", StringComparison.OrdinalIgnoreCase) != true)
+                    if (Console.ReadLine()?.Equals("y", OrdinalIgnoreCase) != true)
                         return (1, null, "Not overwriting - exiting");
                 }
             }
         }
 
         using var handler = new SocketsHttpHandler { ConnectTimeout = timeout ?? TimeSpan.FromSeconds(5), CookieContainer = new(), UseCookies = true };
-        using var client = new HttpClient(handler) { Timeout = timeout ?? Timeout.InfiniteTimeSpan, BaseAddress = endpoint.ToHttpUri() };
+        using var client = new HttpClient(handler) { Timeout = timeout ?? Timeout.InfiniteTimeSpan, BaseAddress = endpoint.AsHttpUri() };
         if (endpoint.UserInfo.Contains(':'))
             client.DefaultRequestHeaders.Authorization = new("Basic", Convert.ToBase64String(Encoding.UTF8.GetBytes(endpoint.UserInfo)));
 
@@ -179,7 +179,7 @@ internal class Client : BackgroundService
         using var socket = new ClientWebSocket();
         if (client.DefaultRequestHeaders.Authorization is not null)
             socket.Options.SetRequestHeader(HeaderNames.Authorization, $"{client.DefaultRequestHeaders.Authorization}");
-        await socket.ConnectAsync(client.BaseAddress.ToWebSocketUri(), stopping).ConfigureAwait(false);
+        await socket.ConnectAsync(client.BaseAddress.AsWebSocketUri(), stopping).ConfigureAwait(false);
         if (!SetCookieHeaderValue.TryParse(await socket.ReceiveStringAsync(stopping).ConfigureAwait(false), out var cookie))
             return (1, null, "Unexpected command received");
         handler.CookieContainer.Add(new Cookie($"{cookie.Name}", $"{cookie.Value}") { Domain = endpoint.Host });
@@ -198,7 +198,7 @@ internal class Client : BackgroundService
                 sock.Options.Cookies = handler.CookieContainer;
                 if (client.DefaultRequestHeaders.Authorization is not null)
                     sock.Options.SetRequestHeader(HeaderNames.Authorization, $"{client.DefaultRequestHeaders.Authorization}");
-                await sock.ConnectAsync(new(client.BaseAddress.ToWebSocketUri(), $"{id}"), stopping).ConfigureAwait(false);
+                await sock.ConnectAsync(new(client.BaseAddress.AsWebSocketUri(), $"{id}"), stopping).ConfigureAwait(false);
                 await sock.SendAsJsonAsync(file.Length, stopping).ConfigureAwait(false);
                 connected.TrySetResult();
                 while (sock.State == WebSocketState.Open && !stopping.IsCancellationRequested)
@@ -240,7 +240,7 @@ internal class Client : BackgroundService
                     break;
                 case WebSocketMessageType.Text:
                     var stderr = Encoding.UTF8.GetString(message.Memory.Span);
-                    if (stderr.StartsWith("frame=", StringComparison.Ordinal))
+                    if (stderr.StartsWith("frame=", Ordinal))
                         Console.Error.Write('\r' + stderr);
                     else
                         Console.Error.WriteLine(stderr);
@@ -270,5 +270,5 @@ internal class Client : BackgroundService
         return (exitCode, null, null);
     }
 
-    private static bool IsNullDevice(string path) => path == "/dev/null" || path.Equals("NUL", StringComparison.OrdinalIgnoreCase);
+    private static bool IsNullDevice(string path) => path == "/dev/null" || path.Equals("NUL", OrdinalIgnoreCase);
 }
