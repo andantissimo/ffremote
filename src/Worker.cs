@@ -56,14 +56,10 @@ internal class Worker
     {
         _lifetime = lifetime;
         _logger = logger;
-        _address = new(server.Features.Get<IServerAddressesFeature>()?.Addresses?.FirstOrDefault() ?? DefaultServerAddress);
+        _address = new Uri(server.Features.Get<IServerAddressesFeature>()?.Addresses
+            ?.OrderBy(a => a.StartsWith("http:", StringComparison.Ordinal) ? 1 : 2)
+            ?.FirstOrDefault()?.Replace("*", "[::]") ?? DefaultServerAddress).WithHost("localhost");
         _htpasswd = htpasswd;
-
-        if (_address.HostNameType == UriHostNameType.IPv4 && IPAddress.Parse(_address.Host) == IPAddress.Any ||
-            _address.HostNameType == UriHostNameType.IPv6 && IPAddress.Parse(_address.Host) == IPAddress.IPv6Any)
-        {
-            _address = _address.WithHost("localhost");
-        }
     }
 
     public async Task InvokeAsync(HttpContext context)
