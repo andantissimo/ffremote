@@ -11,8 +11,6 @@ SyslogIdentifier=@ASSEMBLY_NAME@
 User=@USER@
 Environment=ASPNETCORE_ENVIRONMENT=Production
 Environment=ASPNETCORE_URLS=http://localhost:@PORT@
-Environment=DOTNET_BUNDLE_EXTRACT_BASE_DIR=/var/tmp/.net
-Environment=DOTNET_PRINT_TELEMETRY_MESSAGE=false
 
 [Install]
 WantedBy=multi-user.target

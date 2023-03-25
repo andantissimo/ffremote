@@ -12,10 +12,6 @@
     <string>Production</string>
     <key>ASPNETCORE_URLS</key>
     <string>http://localhost:@PORT@</string>
-    <key>DOTNET_BUNDLE_EXTRACT_BASE_DIR</key>
-    <string>/var/tmp/.net</string>
-    <key>DOTNET_PRINT_TELEMETRY_MESSAGE</key>
-    <string>false</string>
   </dict>
   <key>ProgramArguments</key>
   <array>

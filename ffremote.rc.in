@@ -26,8 +26,6 @@ ffremote_start() {
     cd ${workdir} && \
     ASPNETCORE_ENVIRONMENT=Production \
     ASPNETCORE_URLS=${ffremote_urls} \
-    DOTNET_BUNDLE_EXTRACT_BASE_DIR=/var/tmp/.net \
-    DOTNET_PRINT_TELEMETRY_MESSAGE=false \
     /usr/sbin/daemon -p ${pidfile} -u ${ffremote_user} -o ${logfile} ${command}
 }
 
