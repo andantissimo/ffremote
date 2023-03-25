@@ -62,7 +62,7 @@ internal class Worker
         if (_address.HostNameType == UriHostNameType.IPv4 && IPAddress.Parse(_address.Host) == IPAddress.Any ||
             _address.HostNameType == UriHostNameType.IPv6 && IPAddress.Parse(_address.Host) == IPAddress.IPv6Any)
         {
-            _address = _address.SetHost("localhost");
+            _address = _address.WithHost("localhost");
         }
     }
 
