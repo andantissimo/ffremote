@@ -69,14 +69,15 @@ internal class Htpasswd : Dictionary<string, string>
             final = ctx1.Hash!;
         }
 
-        Span<char> encrypted = stackalloc char[22];
-        APR1Base64(encrypted[ 0..], final[ 0] << 16 | final[ 6] << 8 | final[12], 4);
-        APR1Base64(encrypted[ 4..], final[ 1] << 16 | final[ 7] << 8 | final[13], 4);
-        APR1Base64(encrypted[ 8..], final[ 2] << 16 | final[ 8] << 8 | final[14], 4);
-        APR1Base64(encrypted[12..], final[ 3] << 16 | final[ 9] << 8 | final[15], 4);
-        APR1Base64(encrypted[16..], final[ 4] << 16 | final[10] << 8 | final[ 5], 4);
-        APR1Base64(encrypted[20..], final[11], 2);
-        return new(encrypted[..22]);
+        return string.Create(22, final, (encrypted, final) =>
+        {
+            APR1Base64(encrypted[ 0..], final[ 0] << 16 | final[ 6] << 8 | final[12], 4);
+            APR1Base64(encrypted[ 4..], final[ 1] << 16 | final[ 7] << 8 | final[13], 4);
+            APR1Base64(encrypted[ 8..], final[ 2] << 16 | final[ 8] << 8 | final[14], 4);
+            APR1Base64(encrypted[12..], final[ 3] << 16 | final[ 9] << 8 | final[15], 4);
+            APR1Base64(encrypted[16..], final[ 4] << 16 | final[10] << 8 | final[ 5], 4);
+            APR1Base64(encrypted[20..], final[11], 2);
+        });
     }
 
     private static void APR1Base64(Span<char> p, int v, int n)
