@@ -247,11 +247,20 @@ internal class Worker
                     if (!aborted.IsCancellationRequested && socket.State == WebSocketState.Open)
                         await socket.SendAsync(line, aborted).ConfigureAwait(false);
                 };
-                var exited = process.StartAsync(aborted);
+                process.Start();
                 process.BeginErrorReadLine();
                 session.StandardInput = process.StandardInput;
-                var code = await exited.ConfigureAwait(false);
+                try
+                {
+                    await process.WaitForExitAsync(aborted).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException) when (aborted.IsCancellationRequested)
+                {
+                    process.Kill(true);
+                    throw;
+                }
                 process.CancelErrorRead();
+                var code = process.ExitCode;
                 _logger.LogDebug("Exit code: {Code}", code);
                 session.Exited.TrySetResult(code);
 
@@ -403,12 +412,21 @@ internal class Worker
             using var stderr = new MemoryPoolStream();
             using var stdout = new MemoryPoolStream();
             using var process = new Process { StartInfo = startInfo };
-            await Task.WhenAll(
-                process.StartAsync(aborted),
-                process.StandardError.BaseStream.CopyToAsync(stderr, aborted),
-                process.StandardOutput.BaseStream.CopyToAsync(stdout, aborted)
-            ).ConfigureAwait(false);
-            _logger.LogDebug("Exit code: {Code}", process.ExitCode);
+            process.Start();
+            try
+            {
+                await Task.WhenAll(
+                    process.WaitForExitAsync(aborted),
+                    process.StandardError.BaseStream.CopyToAsync(stderr, aborted),
+                    process.StandardOutput.BaseStream.CopyToAsync(stdout, aborted)
+                ).ConfigureAwait(false);
+                _logger.LogDebug("Exit code: {Code}", process.ExitCode);
+            }
+            catch (OperationCanceledException) when (aborted.IsCancellationRequested)
+            {
+                process.Kill(true);
+                throw;
+            }
 
             var pair = new[]
             {
