@@ -250,15 +250,7 @@ internal class Worker
                 process.Start();
                 process.BeginErrorReadLine();
                 session.StandardInput = process.StandardInput;
-                try
-                {
-                    await process.WaitForExitAsync(aborted).ConfigureAwait(false);
-                }
-                catch (OperationCanceledException) when (aborted.IsCancellationRequested)
-                {
-                    process.Kill(true);
-                    throw;
-                }
+                await process.WaitForExitOrKillAsync(true, aborted).ConfigureAwait(false);
                 process.CancelErrorRead();
                 var code = process.ExitCode;
                 _logger.LogDebug("Exit code: {Code}", code);
@@ -413,20 +405,12 @@ internal class Worker
             using var stdout = new MemoryPoolStream();
             using var process = new Process { StartInfo = startInfo };
             process.Start();
-            try
-            {
-                await Task.WhenAll(
-                    process.WaitForExitAsync(aborted),
-                    process.StandardError.BaseStream.CopyToAsync(stderr, aborted),
-                    process.StandardOutput.BaseStream.CopyToAsync(stdout, aborted)
-                ).ConfigureAwait(false);
-                _logger.LogDebug("Exit code: {Code}", process.ExitCode);
-            }
-            catch (OperationCanceledException) when (aborted.IsCancellationRequested)
-            {
-                process.Kill(true);
-                throw;
-            }
+            await Task.WhenAll(
+                process.WaitForExitOrKillAsync(true, aborted),
+                process.StandardError.BaseStream.CopyToAsync(stderr, aborted),
+                process.StandardOutput.BaseStream.CopyToAsync(stdout, aborted)
+            ).ConfigureAwait(false);
+            _logger.LogDebug("Exit code: {Code}", process.ExitCode);
 
             var pair = new[]
             {
